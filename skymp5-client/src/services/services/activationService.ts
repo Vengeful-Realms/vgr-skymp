@@ -43,22 +43,9 @@ export class ActivationService extends ClientListener {
             return;
         }
 
-        const openState = e.target.getOpenState();
-
-        // TODO: add this to skyrimPlatform.ts
-        const enum OpenState {
-            None,
-            Open,
-            Opening,
-            Closed,
-            Closing,
-        }
-
-        if (openState === OpenState.Opening || openState === OpenState.Closing) {
-            logTrace(this, "Ignoring activation of door because it's already opening or closing");
-            return;
-        }
-
+        // The native activation event is already emitted once per user input.
+        // A transient Opening/Closing state is not a duplicate-event signal;
+        // dropping the event here makes valid door activations disappear.
         this.controller.emitter.emit("sendMessage", {
             message: {
                 t: MsgType.Activate,

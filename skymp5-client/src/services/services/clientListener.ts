@@ -48,6 +48,7 @@ declare module "skyrimPlatform" {
         setVoiceNormalizationEnabled?(enabled: boolean): void;
         setVoiceNormalizationTarget?(target: number): void;
         getVoiceRemoteParticipants?(): string;
+        getVoiceParticipantActivity?(): string;
     }
 }
 

@@ -2,6 +2,7 @@ import { logTrace, logError } from "../../logging";
 import { ClientListener, CombinedController, Sp } from "./clientListener";
 import { MsgType } from "../../messages";
 import { getViewFromStorage } from "../../view/worldViewMisc";
+import { Actor } from "skyrimPlatform";
 
 // Voice chat modes matching C++ VoiceChat::VoiceMode enum
 const VOICE_MODE_PROXIMITY = 0;
@@ -9,6 +10,9 @@ const VOICE_MODE_GLOBAL = 1;
 
 // Default push-to-talk key (V = DxScanCode 47)
 const DEFAULT_PTT_KEY = 47;
+
+// MFG phoneme 0 is the open-mouth Aah driver.
+const MOUTH_PHONEME_AAH = 0;
 
 // Minimum interval between reconnect attempts (ms)
 const RECONNECT_COOLDOWN_MS = 5000;
@@ -21,6 +25,9 @@ export class VoiceChatService extends ClientListener {
   private lastReconnectRequestTime = 0;
   // Maps LiveKit identity -> server-side actor refrId
   private voiceParticipantMap = new Map<string, number>();
+  // Last phoneme value applied to each mapped voice participant. Keeping this
+  // state avoids redundant native face updates while still tracking speech.
+  private mouthPhonemeValues = new Map<string, { localRefrId: number; value: number }>();
 
   constructor(private sp: Sp, private controller: CombinedController) {
     super();
@@ -203,6 +210,7 @@ export class VoiceChatService extends ClientListener {
 
     // Tick voice chat (processes LiveKit events, registers new participants)
     this.sp.mpClientPlugin.tickVoiceChat!();
+    this.updateMouthMovement();
 
     // Check if the LiveKit connection was lost and we need a fresh token.
     // This handles the case where LiveKit's built-in reconnect failed
@@ -279,6 +287,81 @@ export class VoiceChatService extends ClientListener {
 
   }
 
+  private updateMouthMovement() {
+    if (!this.sp.mpClientPlugin.getVoiceParticipantActivity) return;
+
+    let activity: Record<string, number> = {};
+    try {
+      const parsed = JSON.parse(this.sp.mpClientPlugin.getVoiceParticipantActivity!());
+      if (parsed && typeof parsed === "object") {
+        activity = parsed as Record<string, number>;
+      }
+    } catch (e) {
+      logTrace(this, `Voice activity parse failed: ${String(e)}`);
+      return;
+    }
+
+    const view = getViewFromStorage();
+    if (!view) return;
+
+    const activeIdentities = new Set<string>();
+    this.voiceParticipantMap.forEach((serverRefrId, identity) => {
+      activeIdentities.add(identity);
+
+      let localRefrId: number;
+      try {
+        if (serverRefrId < 0xff000000) return;
+        localRefrId = view.getLocalRefrId(serverRefrId);
+      } catch (_) {
+        return;
+      }
+      if (!localRefrId || localRefrId <= 0) return;
+
+      let actor: Actor | null;
+      try {
+        actor = this.sp.Actor.from(this.sp.Game.getFormEx(localRefrId));
+      } catch (_) {
+        return;
+      }
+      if (!actor) return;
+
+      const rawLevel = Number(activity[identity]);
+      const level = Number.isFinite(rawLevel)
+        ? Math.max(0, Math.min(1, rawLevel))
+        : 0;
+      const previous = this.mouthPhonemeValues.get(identity);
+      if (previous && previous.localRefrId === localRefrId &&
+          Math.abs(previous.value - level) < 0.02) {
+        return;
+      }
+
+      try {
+        if (previous && previous.localRefrId !== localRefrId) {
+          this.clearMouthForLocalRefr(previous.localRefrId);
+        }
+        actor.setExpressionPhoneme(MOUTH_PHONEME_AAH, level);
+        this.mouthPhonemeValues.set(identity, { localRefrId, value: level });
+      } catch (_) {
+        // The actor may be unloading between the view lookup and this tick.
+      }
+    });
+
+    for (const [identity, previous] of this.mouthPhonemeValues) {
+      if (activeIdentities.has(identity)) continue;
+      this.clearMouthForLocalRefr(previous.localRefrId);
+      this.mouthPhonemeValues.delete(identity);
+    }
+  }
+
+  private clearMouthForLocalRefr(localRefrId: number) {
+    try {
+      const actor = this.sp.Actor.from(this.sp.Game.getFormEx(localRefrId));
+      actor?.setExpressionPhoneme(MOUTH_PHONEME_AAH, 0);
+    } catch (_) {
+      // The actor may already have been destroyed.
+    }
+  }
+
   private handlePTT() {
     if (!this.voiceChatAvailable) return;
     if (!this.sp.mpClientPlugin.isVoiceChatInitialized?.()) return;
@@ -305,6 +388,11 @@ export class VoiceChatService extends ClientListener {
 
   private shutdownVoice() {
     if (!this.voiceChatAvailable) return;
+
+    this.mouthPhonemeValues.forEach(({ localRefrId }) => {
+      this.clearMouthForLocalRefr(localRefrId);
+    });
+    this.mouthPhonemeValues.clear();
 
     if (this.sp.mpClientPlugin.isVoiceChatInitialized?.()) {
       this.sp.mpClientPlugin.shutdownVoiceChat!();

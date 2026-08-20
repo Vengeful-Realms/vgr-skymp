@@ -7,6 +7,7 @@
 #include <memory>
 #include <mutex>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace VoiceChat {
@@ -103,6 +104,11 @@ void SetNormalizationTarget(float target);
 
 // Get list of currently connected remote participant identities.
 std::vector<std::string> GetRemoteParticipantIdentities();
+
+// Returns the current decoded-audio activity for each remote participant.
+// Values are normalized to [0, 1] and decay as they are read. This is a
+// local playback signal; it is not sent over the network.
+std::vector<std::pair<std::string, float>> GetRemoteParticipantVoiceActivity();
 
 } // namespace VoiceChat
 
