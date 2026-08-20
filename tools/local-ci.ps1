@@ -63,8 +63,14 @@ if (-not $SkipClean) {
     # clean spares client-files and the whole dist tree.
     if (Test-Path $buildDir) {
       Get-ChildItem $buildDir | Where-Object { $_.Name -ne 'client-files' -and $_.Name -ne 'dist' } | ForEach-Object {
-        cmd /c "rmdir /s /q `"$($_.FullName)`"" 2>$null | Out-Host
-        if (Test-Path $_.FullName) { cmd /c "del /f /q `"$($_.FullName)`"" | Out-Host }
+        # No stderr redirection on the native fallbacks: under Stop preference
+        # PS 5.1 turns redirected native stderr into a terminating error.
+        try { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop } catch {}
+        if (Test-Path -LiteralPath $_.FullName) {
+          if ($_.PSIsContainer) { cmd /c "rmdir /s /q `"$($_.FullName)`"" | Out-Null }
+          else { cmd /c "del /f /q `"$($_.FullName)`"" | Out-Null }
+        }
+        if (Test-Path -LiteralPath $_.FullName) { throw "clean: could not remove $($_.FullName)" }
       }
     }
     New-Item -ItemType Directory -Force $buildDir | Out-Null

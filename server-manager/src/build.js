@@ -146,6 +146,23 @@ class Builder {
     const buildDir = config.buildDir
     fs.mkdirSync(buildDir, { recursive: true })
 
+    // Clean-room configure, exactly like tools/local-ci.ps1: an incremental
+    // build over a stale CMake tree produced client DLLs that froze the game
+    // on load (2026-08-20). Spared: client-files (live zip the backend
+    // serves) and dist (live game server + era-paired client payload).
+    this.line('[native] cleaning the CMake tree (sparing client-files and dist)…')
+    let cleaned = 0
+    for (const entry of fs.readdirSync(buildDir)) {
+      if (entry === 'client-files' || entry === 'dist') continue
+      try {
+        fs.rmSync(path.join(buildDir, entry), { recursive: true, force: true })
+        cleaned++
+      } catch (e) {
+        this.line(`[native] could not remove ${entry}: ${e.message}`)
+      }
+    }
+    this.line(`[native] removed ${cleaned} build-tree entrie(s); configure will run from scratch`)
+
     // cmake/yarn.cmake shells out to yarn during configure; npm is not accepted there.
     if (!this.hasCmd('yarn')) {
       this.line('[native] yarn missing - installing with npm…')
@@ -174,6 +191,8 @@ class Builder {
       '-DBUILD_NODEJS=OFF',
       '-DBUILD_FRONT=OFF',
       '-DBUILD_UNIT_TESTS=OFF',
+      '-DPREPARE_NEXUS_ARCHIVES=OFF',
+      '-DCPPCOV_PATH=OFF',
       '-DSKYMP_VOICE_CHAT=ON',
       '-DVCPKG_MANIFEST_FEATURES=voice-chat',
     ]
