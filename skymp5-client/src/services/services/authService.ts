@@ -283,6 +283,7 @@ export class AuthService extends ClientListener {
         this.setListenBrowserMessage(true, 'vgrCharacterKill received');
         this.loggingStartMoment = 0;
         this.sp.browser.setVisible(true);
+        this.sp.browser.setFocused(true);
         this.sp.browser.executeJavaScript(new FunctionInfo(this.loginFailedWidgetSetter).getText({ events, browserState, authData: authData, strings }));
         break;
     }
