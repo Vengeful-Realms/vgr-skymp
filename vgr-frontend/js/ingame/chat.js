@@ -14,7 +14,6 @@
     me: { color: "#c2a3da" },
     do: { color: "#8fae9a" },
     ooc: { color: "#7da7d9" },
-    pm: { color: "#4ec9b0" },
     system: { color: "#eda841" },
     error: { color: "#c96a5c" },
   };
@@ -26,6 +25,7 @@
     history: [],
     historyIndex: -1,
     draft: "",
+    hidden: false,
   };
 
   function byId(id) {
@@ -86,9 +86,6 @@
       span("chat-text", text);
     } else if (channel === "error") {
       span("chat-text", text);
-    } else if (channel === "pm") {
-      span("chat-tag", entry.direction === "out" ? "[PM → " + name + "] " : "[PM] " + name + ": ");
-      span("chat-text", text);
     } else if (channel === "me") {
       span("chat-text", "* " + name + " " + text);
     } else if (channel === "do") {
@@ -134,10 +131,30 @@
     touchIdle();
   }
 
+  function setChatHidden(hidden) {
+    state.hidden = hidden === true;
+    if (els.root) els.root.classList.toggle("manually-hidden", state.hidden);
+  }
+
+  function runLocalCommand(text) {
+    var command = String(text || "").trim().toLowerCase();
+    if (command === "/hide") {
+      setChatHidden(true);
+      send("vgr:ui:close", "chat");
+      return true;
+    }
+    if (command === "/show") {
+      setChatHidden(false);
+      send("vgr:ui:close", "chat");
+      return true;
+    }
+    return false;
+  }
+
   function submit() {
     var text = els.input ? els.input.value.trim() : "";
     if (els.input) els.input.value = "";
-    if (text) {
+    if (text && !runLocalCommand(text)) {
       send("vgr:chat:send", { text: text });
       state.history.push(text);
       while (state.history.length > HISTORY_MAX) state.history.shift();

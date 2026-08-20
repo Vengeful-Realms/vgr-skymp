@@ -12,13 +12,26 @@
 }
 
 #vgr-chat .chat-log {
-  max-height: 30vh;
+  max-height: 80vh;
   padding: 8px 10px;
   overflow-y: auto;
   border: 1px solid rgba(199, 179, 138, 0.3);
   background: linear-gradient(180deg, rgba(24, 21, 18, 0.78), rgba(7, 6, 6, 0.7));
   box-shadow: inset 0 0 0 1px rgba(255, 234, 190, 0.05);
-  transition: opacity 400ms ease, border-color 400ms ease, background 400ms ease;
+  transition: max-height 200ms ease, padding 200ms ease, opacity 400ms ease, border-color 400ms ease, background 400ms ease;
+}
+
+/* /hide keeps the input available when the chat key is pressed, while the log stays invisible. */
+#vgr-chat.manually-hidden .chat-log {
+  max-height: 0;
+  padding-top: 0;
+  padding-bottom: 0;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  opacity: 0;
+  overflow: hidden;
+  pointer-events: none;
 }
 
 /* Chrome dissolves when idle; recent lines stay readable */
@@ -40,7 +53,7 @@
   line-height: 1.3;
   letter-spacing: 0.015em;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 #vgr-chat .chat-name {

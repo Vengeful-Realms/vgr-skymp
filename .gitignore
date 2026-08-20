@@ -55,6 +55,9 @@ skymp5-backend/data/whitelist.json
 skymp5-backend/data/whitelist-staff-notes.json
 skymp5-backend/data/auth-states.json
 /local-dev
+!/local-dev/
+/local-dev/*
+!/local-dev/prepare-offline-server-settings.js
 tools/voice-test/.env
 *.bak-before-*
 skymp5-backend/data/public-keys.json
