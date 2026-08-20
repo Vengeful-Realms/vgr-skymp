@@ -296,22 +296,22 @@ export class Login implements System {
     });
   }
 
-  // VGR: never spawn a character flagged permaDead by the gamemode
-  // (vgr-gamemode/gamemode_extensions/vgr_respawn.js). Any lookup failure
-  // logs and allows so a Mongo blip never locks everyone out.
+  // VGR: never spawn a character that the gamemode retired or removed
+  // (vgr-gamemode/gamemode_extensions/vgr_respawn.js). Lookup failures remain
+  // fail-open for transient Mongo outages, but a missing profile is a hard
+  // rejection so a stale launcher session cannot restore a deleted character.
   private async verifyNotPermaDead(userId: number, profileId: number, ctx: SystemContext): Promise<void> {
-    let permaDead = false;
+    let character: Record<string, any> | null = null;
     try {
-      const character = await this.findBackendCharacter(profileId);
-      permaDead = !!character && character.permaDead === true;
+      character = await this.findBackendCharacter(profileId);
     } catch (err) {
       console.error("verifyNotPermaDead: lookup failed, allowing login:", err);
       return;
     }
-    if (permaDead) {
+    if (!character || character.permaDead === true) {
       ctx.svr.sendCustomPacket(userId, loginFailedPermaDeath);
       ctx.svr.sendCustomPacket(userId, loginFailedPermaDeathLegacy);
-      throw new Error("Character is permanently dead");
+      throw new Error(!character ? "Character no longer exists" : "Character is permanently dead");
     }
   }
 
@@ -325,7 +325,9 @@ export class Login implements System {
     let uri: string = access.backendDatabaseUri || "";
     if (!uri) {
       const databaseUri = allSettings.databaseUri;
-      if (typeof databaseUri !== "string" || databaseUri === "") return null;
+      if (typeof databaseUri !== "string" || databaseUri === "") {
+        throw new Error("backend database URI is not configured");
+      }
       const parsed = new URL(databaseUri);
       parsed.pathname = "/" + dbName;
       uri = parsed.toString();
