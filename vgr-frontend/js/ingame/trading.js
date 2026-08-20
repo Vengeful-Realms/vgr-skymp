@@ -120,7 +120,9 @@ function ensureTradingUiReady() {
 
 function requestManagedUi(name, open) {
     if (!name) return;
-    window.skyrimPlatform?.sendMessage?.("vgr:ui", name);
+    // The client event source only understands vgr:ui:open / vgr:ui:close
+    const message = open ? "vgr:ui:open" : "vgr:ui:close";
+    window.skyrimPlatform?.sendMessage?.(message, name);
 }
 
 function setPanelVisible(element, visible) {
