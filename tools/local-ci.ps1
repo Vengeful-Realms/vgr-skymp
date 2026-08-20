@@ -127,9 +127,14 @@ if (-not $SkipTests) {
 }
 
 Step 'stage-artifacts' {
-  New-Item -ItemType Directory -Force $artifactDir | Out-Null
-  Copy-Item (Join-Path $buildDir 'dist') (Join-Path $artifactDir 'dist') -Recurse
-  foreach ($rel in @('dist\server\scam_native.node', 'dist\client\Data\SKSE\Plugins\SkyrimPlatform.dll', 'dist\client\Data\SKSE\Plugins\MpClientPlugin.dll', 'dist\client\Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll')) {
+  # dist\server is the LIVE game server (the vgr-server checkout) since the
+  # 2026-08-20 restructure: never copy it into artifacts (it holds secrets,
+  # node_modules and a locked native). Stage the client payload only; a
+  # server-native build is a deliberate stopped-server operation whose output
+  # IS the live file.
+  New-Item -ItemType Directory -Force (Join-Path $artifactDir 'dist') | Out-Null
+  Copy-Item (Join-Path $buildDir 'dist\client') (Join-Path $artifactDir 'dist\client') -Recurse
+  foreach ($rel in @('dist\client\Data\SKSE\Plugins\SkyrimPlatform.dll', 'dist\client\Data\SKSE\Plugins\MpClientPlugin.dll', 'dist\client\Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll')) {
     $f = Join-Path $artifactDir $rel
     if (Test-Path $f) {
       $h = (Get-FileHash $f -Algorithm SHA256).Hash
