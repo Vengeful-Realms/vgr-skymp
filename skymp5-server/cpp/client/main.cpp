@@ -202,6 +202,21 @@ __declspec(dllexport) const char* GetVoiceRemoteParticipants()
   return result.c_str();
 }
 
+// Returns a JSON object mapping LiveKit identities to local decoded-audio
+// activity in the [0, 1] range. The values are consumed with a short release
+// on each call, so this is intended for the game-thread voice tick.
+__declspec(dllexport) const char* GetVoiceParticipantActivity()
+{
+  static std::string result;
+  nlohmann::json levels = nlohmann::json::object();
+  for (const auto& [identity, level] :
+       VoiceChat::GetRemoteParticipantVoiceActivity()) {
+    levels[identity] = level;
+  }
+  result = levels.dump();
+  return result.c_str();
+}
+
 #endif // SKYMP_VOICE_CHAT_ENABLED
 
 }

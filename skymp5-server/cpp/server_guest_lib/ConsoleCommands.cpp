@@ -176,6 +176,8 @@ void ConsoleCommands::Execute(
   MpActor& me, const std::string& consoleCommandName,
   const std::vector<ConsoleCommands::Argument>& args)
 {
+  // Keep this dispatcher as an explicit allowlist. Vanilla console commands
+  // must never become server-side state mutation APIs by accident.
   if (!Utils::stricmp(consoleCommandName.data(), "AddItem")) {
     ExecuteAddItem(me, args);
   } else if (!Utils::stricmp(consoleCommandName.data(), "EquipItem")) {

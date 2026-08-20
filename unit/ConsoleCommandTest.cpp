@@ -60,7 +60,6 @@ TEST_CASE("AddItem doesn't execute for non-privilleged users",
   DoConnect(p, 0);
   p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
   p.SetUserActor(0, 0xff000000);
-  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
 
   RawMessageData msgData;
   msgData.userId = 0;
@@ -71,6 +70,37 @@ TEST_CASE("AddItem doesn't execute for non-privilleged users",
   REQUIRE_THROWS_WITH(
     p.GetActionListener().OnConsoleCommand(msgData, msg),
     ContainsSubstring("Not enough permissions to use this command"));
+
+  p.DestroyActor(0xff000000);
+  DoDisconnect(p, 0);
+}
+
+TEST_CASE("Vanilla lock and open-state commands are rejected by the server",
+          "[ConsoleCommand]")
+{
+  PartOne& p = GetPartOne();
+
+  DoConnect(p, 0);
+  p.CreateActor(0xff000000, { 0, 0, 0 }, 0, 0x3c);
+  p.SetUserActor(0, 0xff000000);
+  auto& ac = p.worldState.GetFormAt<MpActor>(0xff000000);
+  ac.SetConsoleCommandsAllowedFlag(true);
+
+  RawMessageData msgData;
+  msgData.userId = 0;
+
+  p.Messages().clear();
+  for (const auto* commandName : {
+         "lock", "setlocklevel", "setopenstate", "unlock" }) {
+    ConsoleCommandMessage msg;
+    msg.data.commandName = commandName;
+    msg.data.args = { int64_t(0x14), int64_t(0) };
+
+    REQUIRE_THROWS_WITH(
+      p.GetActionListener().OnConsoleCommand(msgData, msg),
+      ContainsSubstring("Unknown command name"));
+  }
+  REQUIRE(p.Messages().empty());
 
   p.DestroyActor(0xff000000);
   DoDisconnect(p, 0);

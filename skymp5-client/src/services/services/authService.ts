@@ -254,6 +254,10 @@ export class AuthService extends ClientListener {
         this.controller.lookupListener(NetworkingService).close();
         {
           const reason = String(msgContent["reason"] || "load order mismatch");
+          if (reason.toLowerCase().includes('permanent death')) {
+            this.handleCharacterRetired(reason, 'loginFailedLoadOrderMismatch');
+            break;
+          }
           const expectedCount = Number(msgContent["expectedCount"]);
           const receivedCount = Number(msgContent["receivedCount"]);
           const countText = Number.isFinite(expectedCount) && Number.isFinite(receivedCount)
@@ -287,6 +291,25 @@ export class AuthService extends ClientListener {
         this.sp.browser.executeJavaScript(new FunctionInfo(this.loginFailedWidgetSetter).getText({ events, browserState, authData: authData, strings }));
         break;
     }
+  }
+
+  private handleCharacterRetired(reason: string, source: string): void {
+    const now = Date.now();
+    if (now - this.lastCharacterRetirementHandledAt < 5000) return;
+    this.lastCharacterRetirementHandledAt = now;
+
+    this.authAttemptProgressIndicator = false;
+    this.leaveLoginQueue();
+    this.controller.lookupListener(NetworkingService).close();
+    this.selectedProfileId = null;
+    browserState.comment = reason;
+    browserState.loginFailedReason = '';
+    logTrace(this, `${source} received; returning to character select`, reason);
+    this.setListenBrowserMessage(true, `${source} received`);
+    this.loggingStartMoment = 0;
+    this.sp.browser.setVisible(true);
+    this.sp.browser.setFocused(true);
+    this.executeLoginUiCall('reloadForMainMenu');
   }
 
   private onBrowserWindowLoadedAndOnlineAuthNeeded() {
@@ -1500,6 +1523,7 @@ export class AuthService extends ClientListener {
   };
   private discordAuthState = crypto.randomBytes(32).toString('hex');
   private selectedProfileId: number | null = null;
+  private lastCharacterRetirementHandledAt = 0;
   private queuePollId = 0;
   private queueWsConnected = false;
   private authDialogOpen = false;

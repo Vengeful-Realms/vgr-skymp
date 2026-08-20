@@ -248,10 +248,15 @@ export class ConsoleCommandsService extends ClientListener {
         "cow",
         "disable",
         "fov",
+        // These commands mutate vanilla reference state locally. Keep them
+        // behind the same console-cheat gate as the other cheats.
+        "lock",
         "fw",
         "save",
         "saveini",
         "setav",
+        "setlocklevel",
+        "setopenstate",
         "sgtm",
         "sw",
         "tai",
@@ -266,6 +271,7 @@ export class ConsoleCommandsService extends ClientListener {
         "tm",
         "tmm",
         "twf",
+        "unlock",
     ];
     private allowConsoleCheats = false;
     private adminPermissionKnown = false;

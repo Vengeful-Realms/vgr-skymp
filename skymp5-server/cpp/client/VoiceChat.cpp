@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 #include <spdlog/sinks/basic_file_sink.h>
 
+#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <set>
@@ -61,6 +62,7 @@ struct ParticipantAudio
   std::vector<int16_t> buffer;
   size_t readPos = 0;
   size_t writePos = 0;
+  float voiceActivity = 0.0f;
 
   // 3D position set from the game thread
   float posX = 0.0f;
@@ -130,6 +132,30 @@ struct VoiceChatState
 };
 
 static std::unique_ptr<VoiceChatState> g_state;
+
+float GetVoiceActivity(const std::vector<int16_t>& samples)
+{
+  if (samples.empty()) {
+    return 0.0f;
+  }
+
+  double sumSquares = 0.0;
+  for (const int16_t sample : samples) {
+    const double normalized = static_cast<double>(sample) / 32768.0;
+    sumSquares += normalized * normalized;
+  }
+
+  const float rms = static_cast<float>(
+    std::sqrt(sumSquares / static_cast<double>(samples.size())));
+
+  // Ignore low-level decoder/background noise and map ordinary speech into
+  // the [0, 1] phoneme strength range.
+  constexpr float kNoiseFloor = 0.0125f;
+  constexpr float kFullSpeechRms = 0.12f;
+  const float activity = (rms - kNoiseFloor) /
+    (kFullSpeechRms - kNoiseFloor);
+  return std::clamp(activity, 0.0f, 1.0f);
+}
 
 // ---------------------------------------------------------------------------
 // miniaudio capture callback — called from audio thread
@@ -461,6 +487,7 @@ void OnRemoteAudioFrame(const std::string& participantIdentity,
     VOICE_LOG("OnRemoteAudioFrame NEW participant identity='{}'",
                  participantIdentity);
   }
+  pa.voiceActivity = std::max(pa.voiceActivity, GetVoiceActivity(data));
   pa.buffer.insert(pa.buffer.end(), data.begin(), data.end());
   pa.writePos += data.size();
 }
@@ -850,6 +877,26 @@ std::vector<std::string> VoiceChat::GetRemoteParticipantIdentities()
   }
   for (auto& participant : g_state->room.remoteParticipants()) {
     result.push_back(participant->identity());
+  }
+  return result;
+}
+
+std::vector<std::pair<std::string, float>>
+VoiceChat::GetRemoteParticipantVoiceActivity()
+{
+  std::vector<std::pair<std::string, float>> result;
+  if (!g_state || !g_state->initialized.load()) {
+    return result;
+  }
+
+  std::lock_guard<std::mutex> lock(g_state->playbackMutex);
+  result.reserve(g_state->participants.size());
+  for (auto& [identity, participant] : g_state->participants) {
+    result.emplace_back(identity, participant.voiceActivity);
+    participant.voiceActivity *= 0.75f;
+    if (participant.voiceActivity < 0.001f) {
+      participant.voiceActivity = 0.0f;
+    }
   }
   return result;
 }

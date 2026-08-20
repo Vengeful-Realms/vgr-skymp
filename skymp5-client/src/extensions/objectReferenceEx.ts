@@ -55,10 +55,9 @@ export class ObjectReferenceEx {
       self.blockActivation(false);
     }
 
-    if (self.isLocked()) {
-      self.lock(false, false);
-    }
-
+    // Keep vanilla lock state intact. The server owns lock/activation
+    // decisions; clearing the lock here gives console commands a local
+    // mutation that is not represented in the authoritative world state.
     if (isPickupableItem) {
       self.setMotionType(MotionType.Keyframed, false);
     }
