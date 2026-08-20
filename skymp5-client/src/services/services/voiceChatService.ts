@@ -346,11 +346,11 @@ export class VoiceChatService extends ClientListener {
       }
     });
 
-    for (const [identity, previous] of this.mouthPhonemeValues) {
-      if (activeIdentities.has(identity)) continue;
+    this.mouthPhonemeValues.forEach((previous, identity) => {
+      if (activeIdentities.has(identity)) return;
       this.clearMouthForLocalRefr(previous.localRefrId);
       this.mouthPhonemeValues.delete(identity);
-    }
+    });
   }
 
   private clearMouthForLocalRefr(localRefrId: number) {

@@ -1,5 +1,9 @@
 #ifdef SKYMP_VOICE_CHAT_ENABLED
 
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+
 #include "VoiceChat.h"
 
 #include <livekit/audio_frame.h>
