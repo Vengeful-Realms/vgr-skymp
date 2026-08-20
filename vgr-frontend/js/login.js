@@ -645,7 +645,13 @@
 
   function chooseCharacter(character) {
     if (character && character.permaDead) {
-      setFooter("That character has passed on permanently.");
+      state.selected = normalizeCharacter(character);
+      state.createSelected = false;
+      state.queue = { position: null, total: null, status: "idle" };
+      state.pendingAuth = false;
+      pushLog("Selected fallen character " + state.selected.name + ".");
+      setFooter("That character has passed on permanently. Delete it to free its character slot.");
+      render();
       return;
     }
     state.selected = normalizeCharacter(character);
@@ -678,7 +684,8 @@
       return;
     }
 
-    dom.deleteMessage.textContent = "Are you really sure you want to delete " + state.selected.name
+    var targetLabel = state.selected.permaDead ? "the fallen character " : "";
+    dom.deleteMessage.textContent = "Are you really sure you want to delete " + targetLabel + state.selected.name
       + "? Your character will be marked for deletion and removed permanently after the grace period.";
     dom.deleteModal.hidden = false;
   }
@@ -760,6 +767,12 @@
       return;
     }
 
+    if (state.selected.permaDead) {
+      setFooter("That character has passed on permanently. Delete it to free its character slot.");
+      render();
+      return;
+    }
+
     selectCharacter(state.selected, "existing");
   }
 
@@ -767,6 +780,12 @@
     state.selected = normalizeCharacter(character);
     if (isPendingDeletion(state.selected)) {
       setFooter("Cancel deletion before loading this character.");
+      render();
+      return;
+    }
+
+    if (state.selected.permaDead) {
+      setFooter("That character has passed on permanently. Delete it to free its character slot.");
       render();
       return;
     }
@@ -1061,7 +1080,6 @@
       }
       if (character.permaDead) {
         card.classList.add("perma-dead");
-        card.disabled = true;
       }
       if (state.selected && String(state.selected.profileId) === String(character.profileId)) {
         card.classList.add("selected");
@@ -1139,8 +1157,9 @@
   function renderActions() {
     var pendingSelectedDeletion = isPendingDeletion(state.selected);
     if (dom.loadCharacter) {
-      dom.loadCharacter.disabled = (!state.selected && !state.createSelected) || pendingSelectedDeletion;
-      dom.loadCharacter.textContent = state.createSelected ? "Create Character" : "Load Character";
+      var selectedFallen = !!(state.selected && state.selected.permaDead);
+      dom.loadCharacter.disabled = (!state.selected && !state.createSelected) || pendingSelectedDeletion || selectedFallen;
+      dom.loadCharacter.textContent = state.createSelected ? "Create Character" : selectedFallen ? "Character Unavailable" : "Load Character";
     }
 
     if (dom.createCharacter) {
@@ -1150,7 +1169,11 @@
 
     if (dom.deleteCharacter) {
       dom.deleteCharacter.disabled = !state.selected || state.createSelected;
-      dom.deleteCharacter.textContent = pendingSelectedDeletion ? "Cancel Deletion" : "Delete Character";
+      dom.deleteCharacter.textContent = pendingSelectedDeletion
+        ? "Cancel Deletion"
+        : state.selected && state.selected.permaDead
+          ? "Delete Fallen Character"
+          : "Delete Character";
       dom.deleteCharacter.classList.toggle("cancel-deletion", pendingSelectedDeletion);
     }
   }

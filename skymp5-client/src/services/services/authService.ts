@@ -274,10 +274,21 @@ export class AuthService extends ClientListener {
         this.sp.browser.executeJavaScript(new FunctionInfo(this.loginFailedWidgetSetter).getText({ events, browserState, authData: authData, strings }));
         break;
       case 'vgrCharacterKill':
-        this.handleCharacterRetired(
-          String(msgContent["reason"] || "This character can no longer be played."),
-          'vgrCharacterKill',
-        );
+        // The server retired this character (permadeath). Return to character select.
+        this.authAttemptProgressIndicator = false;
+        this.leaveLoginQueue();
+        this.controller.lookupListener(NetworkingService).close();
+        {
+          const reason = String(msgContent["reason"] || "This character can no longer be played.");
+          logTrace(this, 'vgrCharacterKill received', JSON.stringify(msgContent));
+          browserState.comment = reason;
+        }
+        browserState.loginFailedReason = 'Character retired';
+        this.setListenBrowserMessage(true, 'vgrCharacterKill received');
+        this.loggingStartMoment = 0;
+        this.sp.browser.setVisible(true);
+        this.sp.browser.setFocused(true);
+        this.sp.browser.executeJavaScript(new FunctionInfo(this.loginFailedWidgetSetter).getText({ events, browserState, authData: authData, strings }));
         break;
     }
   }

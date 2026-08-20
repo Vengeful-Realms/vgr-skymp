@@ -9,7 +9,8 @@
 #   powershell -ExecutionPolicy Bypass -File tools\local-ci.ps1 -SkipTests
 #
 # Artifacts land in build-artifacts\<UTCstamp>-<sha>-<flags>\ with a build-report.json.
-# This script never touches server\, build\client-files\, or any live file.
+# This script never touches build\dist\server\ (the live game server),
+# build\client-files\, or any live file.
 
 param(
   [switch]$VoiceChat,
@@ -55,10 +56,13 @@ if (-not (Test-Path (Join-Path $vcpkgDir 'vcpkg.exe'))) {
 
 if (-not $SkipClean) {
   Step 'clean' {
-    # build\client-files holds the LIVE zip the backend serves; wiping it once
-    # took the download endpoint down, so the clean spares it.
+    # build\client-files holds the LIVE zip the backend serves; build\dist\server
+    # IS the running game server (the vgr-server checkout); build\dist\client is
+    # the era-paired client payload the zip is packaged from. Wiping any of them
+    # takes production down or reintroduces the mixed-era client crash, so the
+    # clean spares client-files and the whole dist tree.
     if (Test-Path $buildDir) {
-      Get-ChildItem $buildDir | Where-Object { $_.Name -ne 'client-files' } | ForEach-Object {
+      Get-ChildItem $buildDir | Where-Object { $_.Name -ne 'client-files' -and $_.Name -ne 'dist' } | ForEach-Object {
         cmd /c "rmdir /s /q `"$($_.FullName)`"" 2>$null | Out-Host
         if (Test-Path $_.FullName) { cmd /c "del /f /q `"$($_.FullName)`"" | Out-Host }
       }

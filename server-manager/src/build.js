@@ -348,6 +348,21 @@ class Builder {
     const dep = await this.ensureDeps(dir, 'game server')
     if (!dep.ok) return dep
 
+    // The live server can run straight from the build output dir; esbuild then
+    // overwrites the running bundle in place, so back it up BEFORE building.
+    const sameDir = path.resolve(config.paths.serverDistDir) === path.resolve(config.paths.serverDir)
+    let inPlaceBackupDir = null
+    if (opts.deploy && sameDir) {
+      const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+      inPlaceBackupDir = path.join(config.paths.serverDir, 'manager-backups', stamp, 'dist_back')
+      for (const name of ['skymp5-server.js', 'skymp5-server.js.map']) {
+        const live = path.join(config.paths.serverDir, 'dist_back', name)
+        if (!fs.existsSync(live)) continue
+        fs.mkdirSync(inPlaceBackupDir, { recursive: true })
+        fs.copyFileSync(live, path.join(inPlaceBackupDir, name))
+      }
+    }
+
     // esbuild writes to <repo>/build/dist/server/dist_back (path fixed in the
     // package script); scam_native.node is loaded at runtime from the server
     // cwd, so the native module is not needed to bundle.
@@ -359,6 +374,12 @@ class Builder {
     if (!opts.deploy) {
       this.line(`\n✓ Bundle built: ${bundle} (not deployed)`)
       return { ok: true, bundle }
+    }
+
+    if (sameDir) {
+      if (inPlaceBackupDir) this.line(`[deploy] previous bundle backed up to ${inPlaceBackupDir}`)
+      this.line('\n✓ Bundle built in the live server dir. Restart the Game service to run it.')
+      return { ok: true, bundle, deployed: true }
     }
 
     // Deploy: back up the live bundle, then copy the new one (+ sourcemap) in.

@@ -91,7 +91,11 @@ module.exports = {
     launcherOut:  path.join(buildDir, 'launcher'),
     client:       path.join(repoRoot, 'skymp5-client'),
     server:       path.join(repoRoot, 'skymp5-server'),
-    gamemodeSrcDir: path.join(repoRoot, 'vgr-gamemode'),
+    // The gamemode now lives directly in the live server checkout (the private
+    // vgr-server repo at build/dist/server), so the sync source IS the live dir
+    // and the Gamemode Sync button reports "already matches" - edit and commit
+    // gamemode files in the live checkout instead.
+    gamemodeSrcDir: process.env.VGR_GAMEMODE_SRC || path.dirname(serverSettings),
     serverDistDir:  path.join(buildDir, 'dist', 'server'),
     clientDistDir:  path.join(buildDir, 'dist', 'client'),
 

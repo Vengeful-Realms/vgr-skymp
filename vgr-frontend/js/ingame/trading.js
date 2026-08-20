@@ -62,6 +62,7 @@ const tradeRequestState = {
 const elements = {};
 let tradingUiReady = false;
 let pendingTradingPayload = null;
+let tradingManagedUiRequested = false;
 
 function cacheElements() {
     const ids = [
@@ -119,6 +120,7 @@ function ensureTradingUiReady() {
 
 function requestManagedUi(name, open) {
     if (!name) return;
+    // The client event source only understands vgr:ui:open / vgr:ui:close
     const message = open ? "vgr:ui:open" : "vgr:ui:close";
     window.skyrimPlatform?.sendMessage?.(message, name);
 }
@@ -161,6 +163,10 @@ function cloneItems(items) {
 }
 
 function openTradingMenu(data = demoTradeData) {
+	if (!tradingManagedUiRequested) {
+		tradingManagedUiRequested = true;
+		requestManagedUi("trading", true);
+	}
     tradeState.isOpen = true;
     tradeState.partnerName = data.partnerName || data.tradingWithName || data.targetPlayerName || data.otherPlayerName || "Unknown Player";
     tradeState.playerName = data.playerName || data.myPlayerName || data.characterName || "Adventurer";
@@ -187,6 +193,8 @@ function openTradingMenu(data = demoTradeData) {
 }
 
 function closeTradingMenu() {
+	tradingManagedUiRequested = false;
+	requestManagedUi("trading", false);
     tradeState.isOpen = false;
     closeQtyPicker();
     elements["skyrim-trade"].classList.remove("visible");
@@ -968,6 +976,8 @@ window.vgr_TradingUI = function (eventName, payload) {
 };
 
 window.vgrTradingClose = function (reason) {
+	tradingManagedUiRequested = false;
+	
     tradeState.isOpen = false;
     closeQtyPicker();
     if (!ensureTradingUiReady()) return;
