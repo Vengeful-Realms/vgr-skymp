@@ -56,22 +56,28 @@ if (-not (Test-Path (Join-Path $vcpkgDir 'vcpkg.exe'))) {
 
 if (-not $SkipClean) {
   Step 'clean' {
-    # build\client-files holds the LIVE zip the backend serves; build\dist\server
-    # IS the running game server (the vgr-server checkout); build\dist\client is
-    # the era-paired client payload the zip is packaged from. Wiping any of them
-    # takes production down or reintroduces the mixed-era client crash, so the
-    # clean spares client-files and the whole dist tree.
-    if (Test-Path $buildDir) {
-      Get-ChildItem $buildDir | Where-Object { $_.Name -ne 'client-files' -and $_.Name -ne 'dist' } | ForEach-Object {
-        # No stderr redirection on the native fallbacks: under Stop preference
-        # PS 5.1 turns redirected native stderr into a terminating error.
-        try { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction Stop } catch {}
-        if (Test-Path -LiteralPath $_.FullName) {
-          if ($_.PSIsContainer) { cmd /c "rmdir /s /q `"$($_.FullName)`"" | Out-Null }
-          else { cmd /c "del /f /q `"$($_.FullName)`"" | Out-Null }
-        }
-        if (Test-Path -LiteralPath $_.FullName) { throw "clean: could not remove $($_.FullName)" }
+    # Spare exactly two things: build\client-files (the LIVE zip the backend
+    # serves) and build\dist\server (the RUNNING game server, a vgr-server
+    # checkout with production secrets). Everything else goes, including
+    # build\dist\client - leaving that in place accumulates DLLs and payload
+    # files from many build eras into one incoherent pack, which is the
+    # mixed-era client failure mode.
+    $spare = @{ $buildDir = @('client-files', 'dist'); (Join-Path $buildDir 'dist') = @('server') }
+    $nuke = {
+      param($item)
+      # No stderr redirection on the native fallbacks: under Stop preference
+      # PS 5.1 turns redirected native stderr into a terminating error.
+      try { Remove-Item -LiteralPath $item.FullName -Recurse -Force -ErrorAction Stop } catch {}
+      if (Test-Path -LiteralPath $item.FullName) {
+        if ($item.PSIsContainer) { cmd /c "rmdir /s /q `"$($item.FullName)`"" | Out-Null }
+        else { cmd /c "del /f /q `"$($item.FullName)`"" | Out-Null }
       }
+      if (Test-Path -LiteralPath $item.FullName) { throw "clean: could not remove $($item.FullName)" }
+    }
+    foreach ($dir in @($buildDir, (Join-Path $buildDir 'dist'))) {
+      if (-not (Test-Path $dir)) { continue }
+      $keep = $spare[$dir]
+      Get-ChildItem $dir | Where-Object { $keep -notcontains $_.Name } | ForEach-Object { & $nuke $_ }
     }
     New-Item -ItemType Directory -Force $buildDir | Out-Null
   }
@@ -109,10 +115,31 @@ Step 'configure' {
 }
 
 Step 'build' {
+  # skymp5-server/CMakeLists.txt copies server-settings.json, launch_server.bat,
+  # package.json and yarn.lock into dist/server with UPSTREAM defaults - and
+  # since the 2026-08-20 move that path is the live server holding production
+  # secrets. Snapshot them and put them back after the build.
+  $guardDir = Join-Path $buildDir 'dist\server'
+  $guarded = @()
+  foreach ($name in @('server-settings.json', 'launch_server.bat', 'package.json', 'yarn.lock')) {
+    $p = Join-Path $guardDir $name
+    if (Test-Path $p) { $guarded += @{ Path = $p; Bytes = [System.IO.File]::ReadAllBytes($p) } }
+  }
+
   $args = @('--build', $buildDir, '--config', 'Release')
   foreach ($t in $Targets) { $args += @('--target', $t) }
   & $cmake @args | Out-Host
-  if ($LASTEXITCODE -ne 0) { throw 'build failed' }
+  $buildExit = $LASTEXITCODE
+
+  foreach ($g in $guarded) {
+    $now = if (Test-Path $g.Path) { [System.IO.File]::ReadAllBytes($g.Path) } else { $null }
+    $same = $now -and $now.Length -eq $g.Bytes.Length -and -not (Compare-Object $now $g.Bytes)
+    if (-not $same) {
+      [System.IO.File]::WriteAllBytes($g.Path, $g.Bytes)
+      Write-Host "[guard] restored $(Split-Path $g.Path -Leaf) (the build regenerates it with upstream defaults)"
+    }
+  }
+  if ($buildExit -ne 0) { throw 'build failed' }
 }
 
 if (-not $SkipTests) {
