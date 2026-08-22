@@ -74,7 +74,6 @@
   pointer-events: none !important;
 }
 
-#vgr-game-layer .player-interaction-panel,
 #vgr-game-layer .trade-request-panel {
   border: 1px solid rgba(190, 151, 75, 0.56);
   background:
@@ -82,9 +81,22 @@
     radial-gradient(circle at 50% 0%, rgba(126, 71, 28, 0.28), transparent 70%);
 }
 
+/* The anchored popup stays translucent so the target and the world behind it
+   remain visible; the blur keeps text legible over busy scenes. */
+#vgr-game-layer .player-interaction-panel {
+  border: 1px solid rgba(190, 151, 75, 0.5);
+  background:
+    linear-gradient(180deg, rgba(20, 15, 10, 0.54), rgba(6, 5, 4, 0.46)),
+    radial-gradient(circle at 50% 0%, rgba(126, 71, 28, 0.16), transparent 70%);
+  backdrop-filter: blur(3px);
+  -webkit-backdrop-filter: blur(3px);
+}
+
 #vgr-game-layer .player-interaction-panel {
   width: 100%;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.72);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  /* Text carries its own contrast now that the panel is see-through */
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.95);
 }
 
 #vgr-game-layer .trade-request-panel {
@@ -295,4 +307,21 @@
 
 #vgr-game-layer .player-interaction-toast.visible {
   opacity: 1;
+}
+
+/* Buttons match the popup's translucency without losing their affordance */
+#vgr-game-layer .player-interaction-panel .player-interaction-button,
+#vgr-game-layer .player-interaction-panel .bind-option-button,
+#vgr-game-layer .player-interaction-panel .trade-request-button {
+  background: linear-gradient(180deg, rgba(105, 12, 12, 0.7), rgba(77, 5, 5, 0.7));
+}
+
+#vgr-game-layer .player-interaction-panel .player-interaction-button:hover:not(:disabled),
+#vgr-game-layer .player-interaction-panel .bind-option-button:hover:not(:disabled) {
+  background: linear-gradient(180deg, rgba(126, 18, 18, 0.88), rgba(94, 8, 8, 0.88));
+}
+
+#vgr-game-layer .player-interaction-panel .player-interaction-button:disabled,
+#vgr-game-layer .player-interaction-panel .bind-option-button:disabled {
+  background: linear-gradient(180deg, rgba(44, 39, 33, 0.62), rgba(22, 19, 16, 0.62));
 }
